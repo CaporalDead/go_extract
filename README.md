@@ -24,14 +24,37 @@ pas de Python à installer — un seul exécutable.
 La signature est **toujours vérifiée avant** le déchiffrement : si elle est
 invalide, rien n'est déchiffré (origine non prouvée).
 
-## Version ligne de commande (optionnelle)
+## Version ligne de commande `rxdecrypt` (sans dépendances)
 
-Un binaire `rxdecrypt` (dans `cmd/rxdecrypt`) offre la même opération sans GUI :
+`rxdecrypt` fait la même chose **sans interface graphique**. C'est un binaire
+**100 % statique** : il ne dépend d'**aucune** bibliothèque système (ni OpenGL,
+ni X11). À utiliser si la version graphique ne se lance pas (voir plus bas), ou
+sur un serveur / une machine minimale / WSL.
 
 ```
 rxdecrypt -src DOSSIER            -key VOTRE_CLE_HEX     -out DOSSIER_SORTIE
 rxdecrypt -enc a.zip.enc -pub a.sign.pub -sig a.zip.enc.sig -key @cle.txt -out .
 ```
+
+Il est publié dans les Releases : `rxdecrypt-<os>-<arch>` (Linux amd64/arm64,
+Windows, macOS Intel/Apple Silicon).
+
+## Prérequis d'exécution de la version graphique (Linux)
+
+La version graphique utilise OpenGL : si vous obtenez
+`error while loading shared libraries: libGL.so.1`, installez les bibliothèques
+d'exécution (ou utilisez `rxdecrypt` ci-dessus) :
+
+```
+# Debian / Ubuntu
+sudo apt-get install -y libgl1 libx11-6 libxcursor1 libxrandr2 libxinerama1 libxi6 libxxf86vm1
+# Fedora
+sudo dnf install -y mesa-libGL libX11 libXcursor libXrandr libXinerama libXi libXxf86vm
+# Arch
+sudo pacman -S --needed libglvnd libx11 libxcursor libxrandr libxinerama libxi libxxf86vm
+```
+
+Sur un poste de bureau Linux classique, ces bibliothèques sont déjà présentes.
 
 ## Sécurité / format
 
