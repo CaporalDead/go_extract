@@ -55,14 +55,22 @@ go test ./internal/rxcrypto/...     # valide la crypto
 go build -o go_extract .            # (Windows: -ldflags -H=windowsgui)
 ```
 
-## Binaires pré-construits (CI)
+## Binaires pré-construits (Releases)
 
-Le workflow GitHub Actions `.github/workflows/build.yml` construit les trois
-plateformes (Linux, macOS, Windows) et publie les binaires en **artefacts** de
-build. Onglet **Actions** du dépôt → dernière exécution → section *Artifacts*.
+À chaque tag `vX.Y.Z`, GitHub Actions construit et **publie une Release** avec
+les 4 binaires : **Releases** du dépôt → dernière version.
+
+| Fichier | Plateforme |
+|---|---|
+| `go_extract-windows-amd64.exe` | Windows 64 bits |
+| `go_extract-macos-arm64` | macOS Apple Silicon (M1/M2/M3…) |
+| `go_extract-macos-amd64` | macOS Intel |
+| `go_extract-linux-amd64` | Linux 64 bits |
 
 > ⚠️ Les binaires ne sont **pas signés** (signature de code = certificats
 > payants). Au premier lancement :
 > - **Windows** : SmartScreen → « Informations complémentaires » → « Exécuter
 >   quand même ».
 > - **macOS** : clic droit → « Ouvrir » → « Ouvrir » (contourne Gatekeeper).
+>   Si besoin : `xattr -dr com.apple.quarantine go_extract-macos-*`.
+> - **Linux** : `chmod +x go_extract-linux-amd64` avant de lancer.
