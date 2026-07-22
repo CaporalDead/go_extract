@@ -56,6 +56,42 @@ sudo pacman -S --needed libglvnd libx11 libxcursor libxrandr libxinerama libxi l
 
 Sur un poste de bureau Linux classique, ces bibliothèques sont déjà présentes.
 
+### NixOS
+
+Sur NixOS, on n'installe pas les libs globalement. La **CLI `rxdecrypt`** est un
+binaire Go **statique** : elle fonctionne **directement**, sans rien installer.
+
+Pour la **version graphique**, il faut exposer les dépendances OpenGL/X11.
+Paquets nixpkgs requis :
+
+```
+libGL libxkbcommon
+xorg.libX11 xorg.libXcursor xorg.libXi xorg.libXrandr xorg.libXinerama xorg.libXxf86vm
+```
+
+Trois méthodes :
+
+```bash
+# A. Le plus simple (FHS, zéro config)
+nix-shell -p steam-run --run 'steam-run ./go_extract-linux-amd64'
+
+# B. nix-shell ciblé
+nix-shell -p libGL libxkbcommon xorg.libX11 xorg.libXcursor xorg.libXi \
+             xorg.libXrandr xorg.libXinerama xorg.libXxf86vm --run '
+  export LD_LIBRARY_PATH=$(echo "$buildInputs" | tr " " "\n" | sed "s|$|/lib|" | paste -sd:):/run/opengl-driver/lib
+  ./go_extract-linux-amd64
+'
+```
+
+```nix
+# C. Permanent, dans configuration.nix (puis: nixos-rebuild switch)
+programs.nix-ld.enable = true;
+programs.nix-ld.libraries = with pkgs; [
+  libGL libxkbcommon
+  xorg.libX11 xorg.libXcursor xorg.libXi xorg.libXrandr xorg.libXinerama xorg.libXxf86vm
+];
+```
+
 ## Sécurité / format
 
 - Signature : **Ed25519** détachée sur le **SHA-512** du fichier `.enc`.
