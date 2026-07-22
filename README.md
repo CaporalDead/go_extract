@@ -24,26 +24,20 @@ pas de Python à installer — un seul exécutable.
 La signature est **toujours vérifiée avant** le déchiffrement : si elle est
 invalide, rien n'est déchiffré (origine non prouvée).
 
-## Version ligne de commande `rxdecrypt` (sans dépendances)
+## Linux : version « sans installation » (AppImage)
 
-`rxdecrypt` fait la même chose **sans interface graphique**. C'est un binaire
-**100 % statique** : il ne dépend d'**aucune** bibliothèque système (ni OpenGL,
-ni X11). À utiliser si la version graphique ne se lance pas (voir plus bas), ou
-sur un serveur / une machine minimale / WSL.
+Sur Linux, le plus simple est l'**AppImage** : un fichier unique qui **embarque
+les bibliothèques** (OpenGL/X11). Aucune installation, pas d'erreur
+`libGL.so.1` :
 
+```bash
+chmod +x go_extract-linux-amd64.AppImage
+./go_extract-linux-amd64.AppImage
 ```
-rxdecrypt -src DOSSIER            -key VOTRE_CLE_HEX     -out DOSSIER_SORTIE
-rxdecrypt -enc a.zip.enc -pub a.sign.pub -sig a.zip.enc.sig -key @cle.txt -out .
-```
 
-Il est publié dans les Releases : `rxdecrypt-<os>-<arch>` (Linux amd64/arm64,
-Windows, macOS Intel/Apple Silicon).
-
-## Prérequis d'exécution de la version graphique (Linux)
-
-La version graphique utilise OpenGL : si vous obtenez
-`error while loading shared libraries: libGL.so.1`, installez les bibliothèques
-d'exécution (ou utilisez `rxdecrypt` ci-dessus) :
+Le **binaire nu** `go_extract-linux-amd64` est aussi fourni ; il nécessite les
+bibliothèques OpenGL/X11 sur la machine. Si vous obtenez
+`error while loading shared libraries: libGL.so.1` :
 
 ```
 # Debian / Ubuntu
@@ -54,37 +48,25 @@ sudo dnf install -y mesa-libGL libX11 libXcursor libXrandr libXinerama libXi lib
 sudo pacman -S --needed libglvnd libx11 libxcursor libxrandr libxinerama libxi libxxf86vm
 ```
 
-Sur un poste de bureau Linux classique, ces bibliothèques sont déjà présentes.
-
 ### NixOS
 
-Sur NixOS, on n'installe pas les libs globalement. La **CLI `rxdecrypt`** est un
-binaire Go **statique** : elle fonctionne **directement**, sans rien installer.
-
-Pour la **version graphique**, il faut exposer les dépendances OpenGL/X11.
-Paquets nixpkgs requis :
-
-```
-libGL libxkbcommon
-xorg.libX11 xorg.libXcursor xorg.libXi xorg.libXrandr xorg.libXinerama xorg.libXxf86vm
-```
-
-Trois méthodes :
+Le plus propre sur NixOS est le **flake** de ce dépôt (l'exécutable est déjà
+« wrappé » avec toutes les bibliothèques nécessaires) :
 
 ```bash
-# A. Le plus simple (FHS, zéro config)
-nix-shell -p steam-run --run 'steam-run ./go_extract-linux-amd64'
+nix run github:CaporalDead/go_extract          # lance la GUI
+nix profile install github:CaporalDead/go_extract   # ou l'installer dans le profil
+```
 
-# B. nix-shell ciblé
-nix-shell -p libGL libxkbcommon xorg.libX11 xorg.libXcursor xorg.libXi \
-             xorg.libXrandr xorg.libXinerama xorg.libXxf86vm --run '
-  export LD_LIBRARY_PATH=$(echo "$buildInputs" | tr " " "\n" | sed "s|$|/lib|" | paste -sd:):/run/opengl-driver/lib
-  ./go_extract-linux-amd64
-'
+Alternatives sans flake :
+
+```bash
+# L'AppImage via l'exécuteur d'AppImage de NixOS
+nix-shell -p appimage-run --run 'appimage-run ./go_extract-linux-amd64.AppImage'
 ```
 
 ```nix
-# C. Permanent, dans configuration.nix (puis: nixos-rebuild switch)
+# ou exposer les libs pour le binaire nu (nix-ld), dans configuration.nix :
 programs.nix-ld.enable = true;
 programs.nix-ld.libraries = with pkgs; [
   libGL libxkbcommon
@@ -116,15 +98,16 @@ go build -o go_extract .            # (Windows: -ldflags -H=windowsgui)
 
 ## Binaires pré-construits (Releases)
 
-À chaque tag `vX.Y.Z`, GitHub Actions construit et **publie une Release** avec
-les 4 binaires : **Releases** du dépôt → dernière version.
+À chaque tag `vX.Y.Z`, GitHub Actions construit et **publie une Release** :
+**Releases** du dépôt → dernière version.
 
 | Fichier | Plateforme |
 |---|---|
 | `go_extract-windows-amd64.exe` | Windows 64 bits |
 | `go_extract-macos-arm64` | macOS Apple Silicon (M1/M2/M3…) |
 | `go_extract-macos-amd64` | macOS Intel |
-| `go_extract-linux-amd64` | Linux 64 bits |
+| `go_extract-linux-amd64.AppImage` | Linux — **fichier unique, libs incluses** (recommandé) |
+| `go_extract-linux-amd64` | Linux — binaire nu (libs OpenGL/X11 requises) |
 
 > ⚠️ Les binaires ne sont **pas signés** (signature de code = certificats
 > payants). Au premier lancement :

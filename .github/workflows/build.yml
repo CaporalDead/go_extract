@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 jobs:
-  # Linux + Windows via matrice.
+  # Linux (binaire nu) + Windows via matrice.
   build:
     name: ${{ matrix.out }}
     strategy:
@@ -60,8 +60,7 @@ jobs:
           if-no-files-found: error
 
   # macOS : un seul runner (Apple Silicon) construit arm64 (natif) ET amd64
-  # (cross-compilation via `clang -arch x86_64`). Le SDK macOS embarque les deux
-  # tranches, ce qui évite d'attendre un runner Intel (rare/coûteux en privé).
+  # (cross-compilation via `clang -arch x86_64`).
   build-macos:
     name: macos (arm64 + amd64)
     runs-on: macos-latest
@@ -70,16 +69,11 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: "1.23"
-
-      - name: Test crypto (indépendant de la GUI)
+      - name: Test crypto
         run: go test ./internal/rxcrypto/...
-
       - name: Build arm64 (natif)
-        env:
-          CGO_ENABLED: "1"
-          GOARCH: arm64
+        env: { CGO_ENABLED: "1", GOARCH: arm64 }
         run: go build -trimpath -o go_extract-macos-arm64 .
-
       - name: Build amd64 (cross)
         env:
           CGO_ENABLED: "1"
@@ -87,54 +81,72 @@ jobs:
           CC: "clang -arch x86_64"
           CXX: "clang++ -arch x86_64"
         run: go build -trimpath -o go_extract-macos-amd64 .
-
       - uses: actions/upload-artifact@v4
-        with:
-          name: go_extract-macos-arm64
-          path: go_extract-macos-arm64
-          if-no-files-found: error
+        with: { name: go_extract-macos-arm64, path: go_extract-macos-arm64, if-no-files-found: error }
       - uses: actions/upload-artifact@v4
-        with:
-          name: go_extract-macos-amd64
-          path: go_extract-macos-amd64
-          if-no-files-found: error
+        with: { name: go_extract-macos-amd64, path: go_extract-macos-amd64, if-no-files-found: error }
 
-  # CLI `rxdecrypt` : SANS interface graphique, donc AUCUNE dépendance système
-  # (ni OpenGL/libGL, ni X11). 100 % Go statique (CGO désactivé) -> se
-  # cross-compile pour toutes les plateformes depuis un seul runner. Idéal comme
-  # solution de repli si la version graphique ne se lance pas (machine minimale,
-  # serveur, WSL sans OpenGL…).
-  cli:
-    name: rxdecrypt (CLI, sans dépendances)
-    runs-on: ubuntu-latest
+  # AppImage Linux : un SEUL fichier qui EMBARQUE les bibliothèques OpenGL/X11,
+  # donc lançable sur une machine sans ces libs (le cas `libGL.so.1` manquant).
+  # Construit sur Ubuntu 22.04 (glibc plus ancienne = compatibilité plus large).
+  appimage:
+    name: go_extract-linux-amd64.AppImage
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version: "1.23"
+      - name: Dépendances système
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc libgl1-mesa-dev xorg-dev libxkbcommon-dev pkg-config \
+            imagemagick fuse libfuse2 file wget
       - name: Test crypto
         run: go test ./internal/rxcrypto/...
-      - name: Build (statique, multi-plateformes)
-        env:
-          CGO_ENABLED: "0"
+      - name: Build binaire
+        env: { CGO_ENABLED: "1" }
+        run: go build -trimpath -o go_extract .
+      - name: Assembler l'AppDir
         run: |
-          mkdir -p cli
-          build() { GOOS="$1" GOARCH="$2" go build -trimpath -o "cli/$3" ./cmd/rxdecrypt; }
-          build linux   amd64 rxdecrypt-linux-amd64
-          build linux   arm64 rxdecrypt-linux-arm64
-          build windows amd64 rxdecrypt-windows-amd64.exe
-          build darwin  amd64 rxdecrypt-macos-amd64
-          build darwin  arm64 rxdecrypt-macos-arm64
+          mkdir -p AppDir/usr/bin
+          cp go_extract AppDir/usr/bin/go_extract
+          cat > AppDir/go_extract.desktop <<'EOF'
+          [Desktop Entry]
+          Type=Application
+          Name=go_extract
+          Comment=Déchiffrement des archives de réversibilité Monkey Factory
+          Exec=go_extract
+          Icon=go_extract
+          Categories=Utility;
+          Terminal=false
+          EOF
+          convert -size 256x256 xc:'#1f6feb' AppDir/go_extract.png
+      - name: Construire l'AppImage (linuxdeploy)
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+        run: |
+          wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          chmod +x linuxdeploy-x86_64.AppImage
+          ./linuxdeploy-x86_64.AppImage \
+            --appdir AppDir \
+            --executable AppDir/usr/bin/go_extract \
+            --desktop-file AppDir/go_extract.desktop \
+            --icon-file AppDir/go_extract.png \
+            --output appimage
+          mv go_extract*.AppImage go_extract-linux-amd64.AppImage
+          chmod +x go_extract-linux-amd64.AppImage
+          file go_extract-linux-amd64.AppImage
       - uses: actions/upload-artifact@v4
         with:
-          name: rxdecrypt-cli
-          path: cli/*
+          name: go_extract-linux-amd64.AppImage
+          path: go_extract-linux-amd64.AppImage
           if-no-files-found: error
 
   # Publication automatique d'une Release quand un tag vX.Y.Z est poussé.
   release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [build, build-macos, cli]
+    needs: [build, build-macos, appimage]
     runs-on: ubuntu-latest
     permissions:
       contents: write
