@@ -10,3 +10,6 @@ dist/
 *.zip
 # NE PAS ignorer les fixtures de test :
 !internal/rxcrypto/testdata/*.zip.enc
+
+# Sortie de `nix build`
+/result
