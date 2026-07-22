@@ -1,0 +1,12 @@
+# Binaires construits
+/go_extract
+/go_extract-*
+*.exe
+*.app
+dist/
+
+# Divers
+.DS_Store
+*.zip
+# NE PAS ignorer les fixtures de test :
+!internal/rxcrypto/testdata/*.zip.enc

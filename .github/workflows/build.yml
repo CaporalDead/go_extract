@@ -1,0 +1,63 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.out }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            out: go_extract-linux-amd64
+            ldflags: ""
+          - os: macos-latest
+            out: go_extract-macos-arm64
+            ldflags: ""
+          - os: windows-latest
+            out: go_extract-windows-amd64.exe
+            ldflags: "-H=windowsgui"
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+
+      # Fyne (CGO) nécessite les en-têtes OpenGL / X11 sous Linux.
+      - name: Dépendances système (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc libgl1-mesa-dev xorg-dev libxkbcommon-dev pkg-config
+
+      # Compilateur C pour CGO sous Windows (MinGW-w64).
+      - name: MinGW (Windows)
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          install: mingw-w64-x86_64-gcc
+          path-type: inherit
+
+      - name: Test crypto (indépendant de la GUI)
+        run: go test ./internal/rxcrypto/...
+
+      - name: Build
+        env:
+          CGO_ENABLED: "1"
+        run: go build -trimpath -ldflags "${{ matrix.ldflags }}" -o "${{ matrix.out }}" .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.out }}
+          path: ${{ matrix.out }}
+          if-no-files-found: error
