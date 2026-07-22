@@ -24,19 +24,23 @@ pas de Python à installer — un seul exécutable.
 La signature est **toujours vérifiée avant** le déchiffrement : si elle est
 invalide, rien n'est déchiffré (origine non prouvée).
 
-## Linux : version « sans installation » (AppImage)
+## Linux : AppImage (distributions standard)
 
-Sur Linux, le plus simple est l'**AppImage** : un fichier unique qui **embarque
-les bibliothèques** (OpenGL/X11). Aucune installation, pas d'erreur
-`libGL.so.1` :
+Sur les distributions **standard (FHS)** — Ubuntu, Debian, Fedora, Arch… — le
+plus simple est l'**AppImage**, un fichier unique :
 
 ```bash
 chmod +x go_extract-linux-amd64.AppImage
 ./go_extract-linux-amd64.AppImage
 ```
 
+> ⚠️ Comme **toute** AppImage d'application graphique, elle **n'embarque pas**
+> `libGL` (OpenGL) : cette bibliothèque doit venir du système (elle est fournie
+> par le pilote graphique, présent sur tout bureau Linux). Sur un système
+> **non-FHS comme NixOS**, `libGL.so.1` n'est pas trouvé — voir la section NixOS.
+
 Le **binaire nu** `go_extract-linux-amd64` est aussi fourni ; il nécessite les
-bibliothèques OpenGL/X11 sur la machine. Si vous obtenez
+mêmes bibliothèques OpenGL/X11. Si vous obtenez
 `error while loading shared libraries: libGL.so.1` :
 
 ```
@@ -106,7 +110,7 @@ go build -o go_extract .            # (Windows: -ldflags -H=windowsgui)
 | `go_extract-windows-amd64.exe` | Windows 64 bits |
 | `go_extract-macos-arm64` | macOS Apple Silicon (M1/M2/M3…) |
 | `go_extract-macos-amd64` | macOS Intel |
-| `go_extract-linux-amd64.AppImage` | Linux — **fichier unique, libs incluses** (recommandé) |
+| `go_extract-linux-amd64.AppImage` | Linux (distributions standard) — fichier unique |
 | `go_extract-linux-amd64` | Linux — binaire nu (libs OpenGL/X11 requises) |
 
 > ⚠️ Les binaires ne sont **pas signés** (signature de code = certificats
