@@ -10,6 +10,7 @@ permissions:
   contents: read
 
 jobs:
+  # Linux + Windows via matrice.
   build:
     name: ${{ matrix.out }}
     strategy:
@@ -19,31 +20,22 @@ jobs:
           - os: ubuntu-latest
             out: go_extract-linux-amd64
             ldflags: ""
-          - os: macos-13 # runner Intel (x86_64)
-            out: go_extract-macos-amd64
-            ldflags: ""
-          - os: macos-latest # runner Apple Silicon (arm64)
-            out: go_extract-macos-arm64
-            ldflags: ""
           - os: windows-latest
             out: go_extract-windows-amd64.exe
             ldflags: "-H=windowsgui"
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-go@v5
         with:
           go-version: "1.23"
 
-      # Fyne (CGO) nécessite les en-têtes OpenGL / X11 sous Linux.
       - name: Dépendances système (Linux)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y gcc libgl1-mesa-dev xorg-dev libxkbcommon-dev pkg-config
 
-      # Compilateur C pour CGO sous Windows (MinGW-w64).
       - name: MinGW (Windows)
         if: runner.os == 'Windows'
         uses: msys2/setup-msys2@v2
@@ -66,11 +58,50 @@ jobs:
           path: ${{ matrix.out }}
           if-no-files-found: error
 
-  # Publication automatique d'une Release quand un tag vX.Y.Z est poussé :
-  # récupère les binaires des 4 plateformes et les attache à la release.
+  # macOS : un seul runner (Apple Silicon) construit arm64 (natif) ET amd64
+  # (cross-compilation via `clang -arch x86_64`). Le SDK macOS embarque les deux
+  # tranches, ce qui évite d'attendre un runner Intel (rare/coûteux en privé).
+  build-macos:
+    name: macos (arm64 + amd64)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+
+      - name: Test crypto (indépendant de la GUI)
+        run: go test ./internal/rxcrypto/...
+
+      - name: Build arm64 (natif)
+        env:
+          CGO_ENABLED: "1"
+          GOARCH: arm64
+        run: go build -trimpath -o go_extract-macos-arm64 .
+
+      - name: Build amd64 (cross)
+        env:
+          CGO_ENABLED: "1"
+          GOARCH: amd64
+          CC: "clang -arch x86_64"
+          CXX: "clang++ -arch x86_64"
+        run: go build -trimpath -o go_extract-macos-amd64 .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: go_extract-macos-arm64
+          path: go_extract-macos-arm64
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: go_extract-macos-amd64
+          path: go_extract-macos-amd64
+          if-no-files-found: error
+
+  # Publication automatique d'une Release quand un tag vX.Y.Z est poussé.
   release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: build
+    needs: [build, build-macos]
     runs-on: ubuntu-latest
     permissions:
       contents: write
